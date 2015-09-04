@@ -298,7 +298,7 @@ class R {
    * @return boolean
    */
   static public function cli() {
-    return defined('STDIN') or (substr(PHP_SAPI, 0, 3) == 'cgi' and getenv('TERM'));
+    return defined('STDIN') or (substr(PHP_SAPI, 0, 3) == 'cgi' and $term = getenv('TERM') and $term !== 'unknown');
   }
 
   /**
@@ -322,8 +322,7 @@ class R {
    * @return string
    */
   static public function scheme() {
-    $https = isset($_SERVER['HTTPS']) ? $_SERVER['HTTPS'] : false;
-    return ($https and strtolower($https) != 'off') ? 'https' : 'http';
+    return url::scheme();
   }
 
   /**

@@ -24,8 +24,10 @@ class Str {
     '/б/' => 'b',
     '/Ç|Ć|Ĉ|Ċ|Č|Ц/' => 'C',
     '/ç|ć|ĉ|ċ|č|ц/' => 'c',
-    '/Ð|Ď|Đ|Д/' => 'Dj',
-    '/ð|ď|đ|д/' => 'dj',
+    '/Ð|Ď|Đ/' => 'Dj',
+    '/ð|ď|đ/' => 'dj',
+    '/Д/' => 'D',
+    '/д/' => 'd',
     '/È|É|Ê|Ë|Ē|Ĕ|Ė|Ę|Ě|Е|Ё|Э/' => 'E',
     '/è|é|ê|ë|ē|ĕ|ė|ę|ě|е|ё|э/' => 'e',
     '/Ф/' => 'F',
@@ -298,6 +300,16 @@ class Str {
   }
 
   /**
+   * Checks if the given string is a URL
+   * 
+   * @param string $string
+   * @return boolean
+   */
+  static public function isURL($string) {
+    return filter_var($string, FILTER_VALIDATE_URL);
+  }
+
+  /**
    * Shortens a string and adds an ellipsis if the string is too long
    *
    * <code>
@@ -348,7 +360,13 @@ class Str {
    * @return string
    */
   static public function widont($string = '') {
-    return preg_replace('|([^\s])\s+([^\s]+)\s*$|', '$1&nbsp;$2', $string);
+    return preg_replace_callback('|([^\s])\s+([^\s]+)\s*$|', function($matches) {
+      if(str::contains($matches[2], '-')) {
+        return $matches[1] . ' ' . str_replace('-', '&#8209;', $matches[2]);
+      } else {
+        return $matches[1] . '&nbsp;' . $matches[2];
+      }
+    }, $string);
   }
 
   /**
@@ -430,24 +448,24 @@ class Str {
   /**
    * Convert a string to a safe version to be used in a URL
    *
-   * @param  string  $text The unsafe string
+   * @param  string  $string The unsafe string
    * @param  string  $separator To be used instead of space and other non-word characters.
    * @return string  The safe string
    */
-  static public function slug($string, $separator = '-') {
+  static public function slug($string, $separator = '-', $allowed = 'a-z0-9') {
 
     $string = trim($string);
     $string = static::lower($string);
     $string = static::ascii($string);
 
     // replace spaces with simple dashes
-    $string = preg_replace('![^a-z0-9]!i','-', $string);
+    $string = preg_replace('![^' . $allowed . ']!i',$separator, $string);
     // remove double dashes
-    $string = preg_replace('![-]{2,}!','-', $string);
+    $string = preg_replace('![' . $separator . ']{2,}!',$separator, $string);
     // trim trailing and leading dashes
-    $string = trim($string, '-');
+    $string = trim($string, $separator);
     // replace slashes with dashes
-    $string = str_replace('/', '-', $string);
+    $string = str_replace('/', $separator, $string);
 
     return $string;
 
@@ -498,7 +516,7 @@ class Str {
    * @return string
    */
   static public function ucfirst($string) {
-    return static::upper(static::substr($string, 0, 1)) . static::substr($string, 1);
+    return static::upper(static::substr($string, 0, 1)) . static::lower(static::substr($string, 1));
   }
 
   /**
@@ -552,7 +570,7 @@ class Str {
    */
   static public function stripslashes($string) {
     if(is_array($string)) return $string;
-    return get_magic_quotes_gpc() ? stripslashes(stripslashes($string)) : $string;
+    return get_magic_quotes_gpc() ? stripslashes($string) : $string;
   }
 
   /**

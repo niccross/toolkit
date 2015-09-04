@@ -18,8 +18,20 @@ class Url {
   static public $current = null;
 
   static public function scheme($url = null) {
-    if(is_null($url)) return 'http' . ((empty($_SERVER['HTTPS']) or $_SERVER['HTTPS'] == 'off') ? '' : 's' );
+    if(is_null($url)) {      
+      if(
+        (isset($_SERVER['HTTPS']) and !empty($_SERVER['HTTPS']) and strtolower($_SERVER['HTTPS']) != 'off') or
+        server::get('SERVER_PORT')            == '443' or 
+        server::get('HTTP_X_FORWARDED_PORT')  == '443' or 
+        server::get('HTTP_X_FORWARDED_PROTO') == 'https'
+      ) {
+        return 'https';
+      } else {
+        return 'http';
+      }
+    }
     return parse_url($url, PHP_URL_SCHEME);
+
   }
 
   /**
@@ -29,7 +41,7 @@ class Url {
    */
   static public function current() {
     if(!is_null(static::$current)) return static::$current;
-    return static::$current = static::scheme() . '://' . server::get('HTTP_HOST') . server::get('REQUEST_URI');
+    return static::$current = static::base() . server::get('REQUEST_URI');
   }
 
   /**
@@ -113,6 +125,14 @@ class Url {
   }
 
   /**
+   * Checks if the url contains a query string
+   */
+  static public function hasQuery($url = null) {
+    if(is_null($url)) $url = static::current();
+    return str::contains($url, '?');
+  }
+
+  /**
    */
   static public function hash($url = null) {
     if(is_null($url)) $url = static::current();
@@ -134,14 +154,13 @@ class Url {
     );
 
     $parts  = array_merge($defaults, $parts);
-    $result = array($parts['scheme'] . '://' . $parts['host'] . r(!empty($parts['port']), ':' . $parts['port']));
+    $result = array(r(!empty($parts['scheme']), $parts['scheme'] . '://') . $parts['host'] . r(!empty($parts['port']), ':' . $parts['port']));
 
     if(!empty($parts['fragments'])) $result[] = implode('/', $parts['fragments']);
     if(!empty($parts['params']))    $result[] = static::paramsToString($parts['params']);
     if(!empty($parts['query']))     $result[] = '?' . static::queryToString($parts['query']);
-    if(!empty($parts['hash']))      $result[] = '#' . $parts['hash'];
 
-    return implode('/', $result);
+    return implode('/', $result) . (!empty($parts['hash']) ? '#' . $parts['hash'] : '');
 
   }
 
@@ -215,7 +234,7 @@ class Url {
    */
   static public function isAbsolute($url) {
     // don't convert absolute urls
-    return (str::startsWith($url, 'http://') or str::startsWith($url, 'https://'));
+    return (str::startsWith($url, 'http://') or str::startsWith($url, 'https://') or str::startsWith($url, '//'));
   }
 
   /**
@@ -284,8 +303,16 @@ class Url {
    * @return string
    */
   static public function base($url = null) {
-    if(is_null($url)) $url = static::current();
-    return static::scheme($url) . '://' . static::host($url);
+    if(is_null($url)) {
+      $port = server::get('SERVER_PORT');
+      $port = in_array($port, array(80, 443)) ? null : $port;
+      return static::scheme() . '://' . server::get('SERVER_NAME', server::get('SERVER_ADDR')) . r($port, ':' . $port);
+    } else {
+      $port   = static::port($url);
+      $scheme = static::scheme($url);
+      $host   = static::host($url) . r($port, ':' . $port);
+      return r($scheme, $scheme . '://') . $host;      
+    }
   }
 
   /**
@@ -317,6 +344,20 @@ class Url {
 
     return ($length) ? str::short($url, $length, $rep) : $url;
 
+  }
+
+  /**
+   * Returns the URL for document root no 
+   * matter what the path is. 
+   * 
+   * @return string
+   */
+  static public function index() {
+    if(r::cli()) {
+      return '/';
+    } else {
+      return static::base() . preg_replace('!\/index\.php$!i', '', server::get('SCRIPT_NAME'));
+    }
   }
 
 }

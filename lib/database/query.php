@@ -341,7 +341,7 @@ class Query {
 
         } else if(is_callable($args[0])) {
 
-          $query  = new static($this->db, $this->table);
+          $query  = clone $this;
           $result = call_user_func($args[0], $query);
           $where  = '(' . $query->where . ')';
 
@@ -632,7 +632,7 @@ class Query {
 
     $fetch  = $this->fetch;
     $row    = $this->select($method . '(' . $column . ') as aggregation')->fetch('Obj')->first();
-    $result =  $row ? $row->get('aggregation', $default) : 0;
+    $result =  $row ? $row->get('aggregation') : $default;
     $this->fetch($fetch);
     return $result;
   }
@@ -771,7 +771,7 @@ class Query {
    */
   public function column($column) {
 
-    $results = $this->query($this->select($column)->build('select'), array(
+    $results = $this->query($this->select($column)->order($this->primaryKeyName . ' ASC')->build('select'), array(
       'iterator' => 'array',
       'fetch'    => 'array',
     ));

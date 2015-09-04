@@ -23,6 +23,7 @@ class Upload {
   public $options = array();
   public $error   = null;
   public $file    = null;
+  public $to      = null;
 
   public function __construct($to, $params = array()) {
 
@@ -50,10 +51,25 @@ class Upload {
   }
 
   public function source() {
-    return isset($_FILES[$this->options['input']]) ? $_FILES[$this->options['input']] : null;
+
+    $source = isset($_FILES[$this->options['input']]) ? $_FILES[$this->options['input']] : null;
+
+    // prevent duplicate ios uploads
+    // ios automatically uploads all images as image.jpg, 
+    // which will lead to overwritten duplicates. 
+    // this dirty hack will simply add a uniqid between the 
+    // name and the extension to avoid duplicates
+    if($source and f::name($source['name']) == 'image' and detect::ios()) {
+      $source['name'] = 'image-' . uniqid() . '.' . ltrim(f::extension($source['name']), '.');
+    }
+
+    return $source;
+
   }
 
   public function to() {
+
+    if(!is_null($this->to)) return $this->to;
 
     $source        = $this->source();
     $name          = f::name($source['name']);
@@ -61,11 +77,15 @@ class Upload {
     $safeName      = f::safeName($name);
     $safeExtension = str_replace('jpeg', 'jpg', str::lower($extension));
 
-    return str::template($this->options['to'], array(
+    if(empty($safeExtension)) {
+      $safeExtension = f::mimeToExtension(f::mime($source['tmp_name']));
+    }
+
+    return $this->to = str::template($this->options['to'], array(
       'name'          => $name,
       'filename'      => $source['name'],
       'safeName'      => $safeName,
-      'safeFilename'  => $safeName . '.' . $safeExtension,
+      'safeFilename'  => $safeName . r(!empty($safeExtension), '.' . $safeExtension),
       'extension'     => $extension,
       'safeExtension' => $safeExtension
     ));

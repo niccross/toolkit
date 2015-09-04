@@ -15,7 +15,7 @@ class Dir {
 
   static public $defaults = array(
     'permissions' => 0755,
-    'ignore'      => array('.', '..', '.DS_Store', '.gitignore', '.git', '.svn', '.htaccess')
+    'ignore'      => array('.', '..', '.DS_Store', '.gitignore', '.git', '.svn', '.htaccess', 'Thumb.db', '@eaDir')
   );
 
   /**
@@ -134,7 +134,7 @@ class Dir {
    * @return mixed
    */
   static public function niceSize($dir) {
-    return static::size($dir);
+    return f::niceSize(static::size($dir));
   }
 
   /**

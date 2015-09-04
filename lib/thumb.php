@@ -17,19 +17,22 @@ class Thumb extends Obj {
   static public $drivers = array();
 
   static public $defaults = array(
-    'filename'  => '{safeName}-{hash}.{extension}',
-    'url'       => '/thumbs',
-    'root'      => '/thumbs',
-    'driver'    => 'im',
-    'memory'    => '128M',
-    'quality'   => 100,
-    'blur'      => false,
-    'width'     => null,
-    'height'    => null,
-    'upscale'   => false,
-    'crop'      => false,
-    'grayscale' => false,
-    'overwrite' => false,
+    'destination' => false,
+    'filename'    => '{safeName}-{hash}.{extension}',
+    'url'         => '/thumbs',
+    'root'        => '/thumbs',
+    'driver'      => 'im',
+    'memory'      => '128M',
+    'quality'     => 90,
+    'blur'        => false,
+    'blurpx'      => 10,
+    'width'       => null,
+    'height'      => null,
+    'upscale'     => false,
+    'crop'        => false,
+    'grayscale'   => false,
+    'overwrite'   => false,
+    'autoOrient'  => false,
   );
 
   public $source      = null;
@@ -46,23 +49,9 @@ class Thumb extends Obj {
    */
   public function __construct($source, $params = array()) {
 
-    $this->source  = $this->result = is_a($source, 'Media') ? $source : new Media($source);
-    $this->options = array_merge(static::$defaults, $this->params($params));
-
-    $this->destination = new Obj();
-    $this->destination->filename = str::template($this->options['filename'], array(
-      'extension'    => $this->source->extension(),
-      'name'         => $this->source->name(),
-      'filename'     => $this->source->filename(),
-      'safeName'     => f::safeName($this->source->name()),
-      'safeFilename' => f::safeName($this->source->name()) . '.' . $this->extension(),
-      'width'        => $this->options['width'],
-      'height'       => $this->options['height'],
-      'hash'         => md5($this->source->root() . $this->settingsIdentifier()),
-    ));
-
-    $this->destination->url  = $this->options['url'] . '/' . $this->destination->filename;
-    $this->destination->root = $this->options['root'] . DS . $this->destination->filename;
+    $this->source      = $this->result = is_a($source, 'Media') ? $source : new Media($source);
+    $this->options     = array_merge(static::$defaults, $this->params($params));
+    $this->destination = $this->destination();
 
     // don't create the thumbnail if it's not necessary
     if($this->isObsolete()) return;
@@ -90,6 +79,39 @@ class Thumb extends Obj {
 
     // create the result object
     $this->result = new Media($this->destination->root, $this->destination->url);
+
+  }
+
+  /**
+   * Build the destination object
+   * 
+   * @return Obj
+   */
+  public function destination() {
+
+    if(is_callable($this->options['destination'])) {
+      return call($this->options['destination'], $this);
+    } else {
+
+      $destination = new Obj();
+
+      $destination->filename = str::template($this->options['filename'], array(
+        'extension'    => $this->source->extension(),
+        'name'         => $this->source->name(),
+        'filename'     => $this->source->filename(),
+        'safeName'     => f::safeName($this->source->name()),
+        'safeFilename' => f::safeName($this->source->name()) . '.' . $this->extension(),
+        'width'        => $this->options['width'],
+        'height'       => $this->options['height'],
+        'hash'         => md5($this->source->root() . $this->settingsIdentifier()),
+      ));
+
+      $destination->url  = $this->options['url'] . '/' . $destination->filename;
+      $destination->root = $this->options['root'] . DS . $destination->filename;
+
+      return $destination;
+
+    }
 
   }
 
@@ -257,6 +279,10 @@ thumb::$drivers['im'] = function($thumb) {
     $command[] = '-colorspace gray';
   }
 
+  if($thumb->options['autoOrient']) {
+    $command[] = '-auto-orient';
+  }
+
   $command[] = '-resize';
 
   if($thumb->options['crop']) {
@@ -271,7 +297,7 @@ thumb::$drivers['im'] = function($thumb) {
   $command[] = '-quality ' . $thumb->options['quality'];
 
   if($thumb->options['blur']) {
-    $command[] = '-blur 0x8';
+    $command[] = '-blur 0x' . $thumb->options['blurpx'];
   }
 
   $command[] = '"' . $thumb->destination->root . '"';
@@ -291,7 +317,7 @@ thumb::$drivers['gd'] = function($thumb) {
     $img->quality = $thumb->options['quality'];
 
     if($thumb->options['crop']) {
-      $img->thumbnail($thumb->options['width'], $thumb->options['height']);
+      @$img->thumbnail($thumb->options['width'], $thumb->options['height']);
     } else {
       $dimensions = clone $thumb->source->dimensions();
       $dimensions->fitWidthAndHeight($thumb->options['width'], $thumb->options['height'], $thumb->options['upscale']);
@@ -303,8 +329,12 @@ thumb::$drivers['gd'] = function($thumb) {
     }
 
     if($thumb->options['blur']) {
-      $img->blur('gaussian', 10);
+      $img->blur('gaussian', $thumb->options['blurpx']);
     }
+
+    if($thumb->options['autoOrient']) {
+      $img->auto_orient();
+    }    
 
     @$img->save($thumb->destination->root);
   } catch(Exception $e) {

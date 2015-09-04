@@ -88,7 +88,14 @@ class Router {
 
     if(is_array($pattern)) {
       foreach($pattern as $v) {
-        $this->register($v['pattern'], $v);
+        if(is_array($v['pattern'])) {
+          foreach($v['pattern'] as $p) {
+            $v['pattern'] = $p;
+            $this->register($p, $v);
+          }
+        } else {        
+          $this->register($v['pattern'], $v);
+        }
       }
       return $this;
     }
@@ -115,6 +122,14 @@ class Router {
         $route->method = array($route->method);
       }
 
+    }
+
+    if(is_string($route->filter)) {
+      if(strpos($route->filter, '|') !== false) {
+        $route->filter = str::split($route->filter, '|');
+      } else {
+        $route->filter = array($route->filter);
+      }
     }
 
     foreach($route->method as $method) {
@@ -215,8 +230,7 @@ class Router {
 
     }
 
-    if($this->route) {
-      $this->filterer($this->route->filter);
+    if($this->route and $this->filterer($this->route->filter) !== false) {
       return $this->route;
     } else {
       return null;
